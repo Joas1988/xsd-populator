@@ -178,7 +178,6 @@ class XsdPopulator
       if node_content.is_a?(Informer) && node_content.namespace.to_s.length > 0
         node_name = "#{node_content.namespace}:#{node_name}"
       end
-
       # simple node; name, value, attributes
       if !element.child_elements?
         cont = node_content.is_a?(Informer) && node_content.content? ? node_content.content : node_content
@@ -187,10 +186,11 @@ class XsdPopulator
       end
 
       # complex node
-      child_provider = provider
 
       if node_content.respond_to?(:try_take)
         child_provider = node_content
+      elsif node_content.is_a?(Informer) && node_content.content.respond_to?(:try_take)
+        child_provider = node_content.content
       elsif !node_content.is_a?(Informer)
         logger.warn "Got non-nil, non-provider and non-infomer value for element with child elements (value: #{node_content}, element: #{element.name}, stack: #{stack.inspect})" if node_content
         # strategy dictates to continue; just use the current element's provider for its children
@@ -200,8 +200,12 @@ class XsdPopulator
       xml.tag!(node_name, attributes_hash) do
         # loop over all child node definitions
         element.elements.each do |child|
-          # this method call itself recursively for every child node definition of the current element
-          build_element(xml, child, child_provider, stack + [element.name])
+            # this method call itself recursively for every child node definition of the current element
+          if child_provider
+            build_element(xml, child, child_provider, [])
+          else
+            build_element(xml, child, provider, stack + [element.name])
+          end
         end
       end
     end
@@ -314,6 +318,7 @@ class XsdPopulator
 
   def build?(element, provider, stack, opts = {})
     content = opts[:content] || provider.try_take([stack, element.name].flatten.compact)
+    content = content.content if content.is_a?(Informer)
 
     # we got an Informer object that tells us explicitly to skip this node? Yes sir.
     return false if content.is_a?(Informer) && content.skip?
