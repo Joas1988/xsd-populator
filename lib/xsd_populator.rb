@@ -318,10 +318,10 @@ class XsdPopulator
 
   def build?(element, provider, stack, opts = {})
     content = opts[:content] || provider.try_take([stack, element.name].flatten.compact)
-    content = content.content if content.is_a?(Informer)
 
     # we got an Informer object that tells us explicitly to skip this node? Yes sir.
     return false if content.is_a?(Informer) && content.skip?
+    content = content.content if content.is_a?(Informer)
 
     # For comlex nodes we need either;
     # - a data provider or
